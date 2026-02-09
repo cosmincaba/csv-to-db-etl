@@ -1,0 +1,3 @@
+@echo off
+echo Running ETL pipeline...
+python -m src.main
