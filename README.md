@@ -34,17 +34,9 @@ docker compose up -d
 python -m src.create_tables
 ```
 
-## Usage
+## Run
 
-```bash
-python -m src.main
-```
-
-The pipeline performs the following steps:
-1. **Extract** - Read CSV files from the input directory
-2. **Validate** - Check schema, nulls, and duplicates
-3. **Transform** - Standardize types, dates, and formats
-4. **Load** - Insert validated data into PostgreSQL
+(Coming soon) This project will run an Extract -> Validate -> Transform -> Load pipeline
 
 ## Roadmap
 
