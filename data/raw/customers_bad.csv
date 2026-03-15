@@ -1,0 +1,9 @@
+customer_id,full_name,email,created_at
+1,John Doe,john.doe@email.com,2024-01-15 10:30:00
+2,Jane Smith,jane.smith@email.com,2024-01-16 14:22:00
+,Bob Wilson,bob.w@email.com,2024-01-17 09:15:00
+4,,alice@email.com,2024-01-18 10:00:00
+ABC,Charlie Brown,charlie@email.com,2024-01-19 11:00:00
+6,Dave Smith,dave@email.com,not-a-date
+7,Eve Johnson,eve@email.com,2024-01-21 13:00:00
+7,Frank White,frank@email.com,2024-01-22 14:00:00

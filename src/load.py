@@ -24,12 +24,21 @@ def load_to_db(df: pd.DataFrame, table_name: str) -> int:
     rows_inserted = 0
 
     try:
+        df_to_load = df.copy()
+
+        # Convert float columns back to int where applicable, pandas convert int to float when there are nulls
+        for col in df_to_load.columns:
+            if df_to_load[col].dtype == 'float64':
+                if df_to_load[col].notna().all() and (df_to_load[col] == df_to_load[col].astype(int)).all():
+                    df_to_load[col] = df_to_load[col].astype(int) 
+                    logger.debug(f"Converted column '{col}' from float to int")
+
         with psycopg.connect(cfg.dsn) as conn:
             with conn.cursor() as cur:
                 # Loop through each row in the DataFrame
-                for index, row in df.iterrows():
+                for index, row in df_to_load.iterrows():
                     # Build INSERT statement dynamically
-                    columns = ', '.join(df.columns)
+                    columns = ', '.join(df_to_load.columns)
                     placeholders = ', '.join(['%s'] * len(row))
                     query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
 

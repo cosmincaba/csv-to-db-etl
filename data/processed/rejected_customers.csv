@@ -1,0 +1,7 @@
+customer_id,full_name,email,created_at,rejection_reason
+,Bob Wilson,bob.w@email.com,2024-01-17 09:15:00,Missing customer_id;Invalid customer_id (not an integer)
+4,,alice@email.com,2024-01-18 10:00:00,Missing full_name
+ABC,Charlie Brown,charlie@email.com,2024-01-19 11:00:00,Invalid customer_id (not an integer)
+6,Dave Smith,dave@email.com,not-a-date,Invalid created_at format
+7,Eve Johnson,eve@email.com,2024-01-21 13:00:00,Duplicate customer_id
+7,Frank White,frank@email.com,2024-01-22 14:00:00,Duplicate customer_id
