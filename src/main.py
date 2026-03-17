@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 from src.extract import extract_csv
 from src.validate import validate_dataframe, save_rejected_rows
+from src.transform import transform_dataframe, save_transformed_data
 from src.load import load_to_db
 from src.logger import setup_logger
 
@@ -56,11 +57,11 @@ def main():
 
     try:
         # Extract
-        logger.info("\n[1/3] Extracting data from CSV...")
+        logger.info("\n[1/4] Extracting data from CSV...")
         df = extract_csv(args.input)
 
         # Validate
-        logger.info("\n[2/3] Validating data...")
+        logger.info("\n[2/4] Validating data...")
 
         if args.table == "customers":
             valid_df, rejected_df = validate_dataframe(
@@ -85,10 +86,18 @@ def main():
         if len(valid_df) == 0:
             logger.warning("No valid rows to load into the database. Exiting pipeline.")
             return 1
+        
+        # Transform
+        logger.info("\n[3/4] Transforming data...")
+        transformed_df = transform_dataframe(valid_df, args.table)
+
+        # Save transformed data
+        clean_file = f"data/processed/clean_{args.table}.csv"
+        save_transformed_data(transformed_df, clean_file)
 
         # Load
-        logger.info("\n[3/3] Loading data into database...")
-        rows_loaded = load_to_db(valid_df, args.table)
+        logger.info("\n[4/4] Loading data into database...")
+        rows_loaded = load_to_db(transformed_df, args.table)
 
         # Summary
         logger.info("\n" + "=" * 60)
@@ -96,6 +105,7 @@ def main():
         logger.info(f"Rows extracted: {len(df)}")
         logger.info(f"Rows validated: {len(valid_df)}")
         logger.info(f"Rows rejected: {len(rejected_df)}")
+        logger.info(f"Rows transformed: {len(transformed_df)}")
         logger.info(f"Rows loaded: {rows_loaded}")
         logger.info("=" * 60)
 

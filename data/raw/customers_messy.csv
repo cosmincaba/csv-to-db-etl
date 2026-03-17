@@ -1,0 +1,4 @@
+customer_id,Full Name,Email,created_at
+1,  JOHN DOE  ,JOHN@EMAIL.COM,2024-01-15 10:30:00
+2,jane smith  ,  JANE@EMAIL.COM  ,2024-01-16
+3,  Bob Wilson,Bob@Email.Com  ,2024-01-17 09:15:00
