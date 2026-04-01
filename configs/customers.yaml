@@ -1,0 +1,33 @@
+table: customers
+input_path: data/raw/customers.csv
+delimiter: ","
+
+# Validation rules
+validation:
+  required_columns:
+    - customer_id
+    - full_name
+    - email
+    - created_at
+  
+  non_null_columns:
+    - customer_id
+    - full_name
+    - email
+    - created_at
+
+  integer_columns:
+    - customer_id
+  
+  datetime_columns:
+    - created_at
+
+# Transformation rules
+transformation:
+
+  apply_customer_transformations: true
+
+# Output settings
+output:
+  rejected_file: data/processed/rejected_customers.csv
+  clean_file: data/processed/clean_customers.csv

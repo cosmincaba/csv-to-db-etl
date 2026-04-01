@@ -1,0 +1,36 @@
+table: transactions
+input_path: data/raw/transactions.csv
+delimiter: ","
+
+# Validation rules
+validation:
+  required_columns:
+    - transaction_id
+    - customer_id
+    - amount
+    - currency
+    - transaction_date
+  
+  non_null_columns:
+    - transaction_id
+    - customer_id
+    - amount
+    - currency
+    - transaction_date
+
+  integer_columns:
+    - transaction_id
+    - customer_id
+  
+  datetime_columns:
+    - transaction_date
+
+# Transformation rules
+transformation:
+
+  apply_transaction_transformations: true
+
+# Output settings
+output:
+  rejected_file: data/processed/rejected_transactions.csv
+  clean_file: data/processed/clean_transactions.csv
