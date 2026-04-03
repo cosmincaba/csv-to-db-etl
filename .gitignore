@@ -21,3 +21,10 @@ Thumbs.db
 # DB settings
 .env
 
+# Artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+*.pyc
+__pycache__/
+

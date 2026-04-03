@@ -14,22 +14,21 @@ def transform_dataframe(df: pd.DataFrame, table_name: str) -> pd.DataFrame:
     # Make a copy to avoid modifying original DataFrame
     df_transformed = df.copy()
 
-    # Transformation 1: Trim whitespace from string columns
-    for col in df_transformed.columns:
-        if df_transformed[col].dtype == 'object': # object = string in pandas
-            df_transformed[col] = df_transformed[col].str.strip()
-            logger.debug(f"Trimmed whitespace from column: {col}")
-    
-    logger.info ("Trimmed whitespace from string columns")
-
-    # Transformation 2: Table-specific transformations
+    # Transformation 1: Table-specific transformations
     if table_name == 'customers':
         df_transformed = transform_customers(df_transformed)
     elif table_name == 'transactions':
         df_transformed = transform_transactions(df_transformed)
     else:
         logger.warning(f"No specific transformations defined for table: {table_name}")
+
+    # Transformation 2: Trim whitespace from string columns
+    for col in df_transformed.columns:
+        if df_transformed[col].dtype == 'object': # object = string in pandas
+            df_transformed[col] = df_transformed[col].str.strip()
+            logger.debug(f"Trimmed whitespace from column: {col}")
     
+    logger.info ("Trimmed whitespace from string columns")
     logger.info("Data transformation completed")
     logger.debug(f"Output shape: {df_transformed.shape}")
 
@@ -80,12 +79,12 @@ def transform_customers(df: pd.DataFrame) -> pd.DataFrame:
 
     # Transformation: Title case for names
     if 'full_name' in df.columns:
-        df['full_name'] = df['full_name'].str.title()
+        df['full_name'] = df['full_name'].str.strip().str.title()
         logger.debug("Applied title case to full_name column")
     
     # Transformation: Lowercase for emails
     if 'email' in df.columns:
-        df['email'] = df['email'].str.lower()
+        df['email'] = df['email'].str.strip().str.lower()
         logger.debug("Applied lowercase to email column")
     
     # Transformation: Standardize datetime format

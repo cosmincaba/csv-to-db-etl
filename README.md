@@ -221,6 +221,38 @@ CREATE TABLE transactions (
     transaction_date DATE NOT NULL
 );
 ```
+## Testing
+
+The project uses pytest for automated testing.
+
+### Run All Tests
+```bash
+pytest
+```
+
+### Run Tests with Coverage
+```bash
+pytest --cov=src
+```
+
+### Run Specific Test File
+```bash
+pytest tests/test_validate.py
+```
+
+### Test Structure
+```
+tests/
+├── __init__.py
+├── test_config_loader.py  # Config parsing tests
+├── test_transform.py      # Data transformation tests
+└── test_validate.py       # Data validation tests
+```
+
+Tests follow the AAA pattern:
+- **Arrange**: Set up test data
+- **Act**: Call the function
+- **Assert**: Check the result
 
 ## Development Progress
 
@@ -233,7 +265,7 @@ CREATE TABLE transactions (
 - [x] CLI with argparse
 - [x] Idempotent loads (run multiple times safely)
 - [x] Config-driven pipeline (YAML)
-- [ ] Unit tests (Day 10)
+- [x] Unit tests (Day 10)
 - [ ] Error handling improvements (Day 11)
 - [ ] Run metrics and reports (Day 12)
 - [ ] Multiple dataset support (Day 14)
