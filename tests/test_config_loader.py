@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from src.config_loader import load_config, validate_config
+from src.config_loader import load_config, validate_config, ConfigError
 
 def test_load_config_file_not_found():
     """Test that load_config raises error for non-existent file."""
@@ -25,12 +25,12 @@ def test_validate_config_missing_table():
 
     # ARRANGE
     invalid_config = {
-        'inpput_path': 'data/raw/test.csv',
+        'input_path': 'data/raw/test.csv',
         'validation': {'required_columns': ['id']}
     }
 
     # ACT & ASSERT
-    with pytest.raises(ValueError, match="missing required field: 'table'"):
+    with pytest.raises(ConfigError, match="missing required field: 'table'"):
         validate_config(invalid_config)
 
 def test_validate_config_missing_validation():
@@ -41,7 +41,7 @@ def test_validate_config_missing_validation():
         'input_path': 'data/raw/test.csv'
     }
 
-    with pytest.raises(ValueError, match="missing required field: 'validation'"):
+    with pytest.raises(ConfigError, match="missing required field: 'validation'"):
         validate_config(invalid_config)
 
 def test_validate_config_valid():

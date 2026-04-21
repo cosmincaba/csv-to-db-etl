@@ -4,8 +4,9 @@ from src.extract import extract_csv
 from src.validate import validate_dataframe, save_rejected_rows
 from src.transform import transform_dataframe, save_transformed_data
 from src.load import load_to_db
-from src.config_loader import load_config
+from src.config_loader import load_config, ConfigError
 from src.logger import setup_logger
+from src.exit_codes import *
 
 logger = setup_logger(__name__)
 
@@ -20,7 +21,7 @@ def parse_arguments():
         description="ETL Pipeline to load CSV data into PostgreSQL",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-  
+
   Examples:
   python -m src.main --config configs/customers.yaml
 
@@ -39,7 +40,7 @@ def parse_arguments():
         type=str,
         help="Path to input CSV file (e.g., data/raw/customers.csv)"
     )
-    
+
     parser.add_argument(
         '--table', '-t',
         type=str,
@@ -50,7 +51,7 @@ def parse_arguments():
 
     if not args.config and not (args.input and args.table):
         parser.error("Either --config or both --input and --table must be provided.")
-    
+
     return args
 
 
@@ -67,69 +68,98 @@ def main():
 
     try:
         # Load config
-        if args.config:
-            logger.info("Running in config-driven mode")
-            config = load_config(args.config)
+        try:
+            if args.config:
+                logger.info("Running in config-driven mode")
+                config = load_config(args.config)
 
-            input_file = config['input_path']
-            table_name = config['table']
-            validation_config = config['validation']
-            output_config = config.get('output', {})
+                input_file = config['input_path']
+                table_name = config['table']
+                validation_config = config['validation']
+                output_config = config.get('output', {})
 
-        else:
-            logger.warning("Running in command-line mode, consider using --config for better maintainability")
-            input_file = args.input
-            table_name = args.table
-
-            # Hardcoded validation rules for command-line mode
-            if table_name == "customers":
-                validation_config = {
-                    'required_columns': ['customer_id', 'full_name', 'email', 'created_at'],
-                    'non_null_columns': ['customer_id', 'full_name', 'email', 'created_at'],
-                    'integer_columns': ['customer_id'],
-                    'datetime_columns': ['created_at']
-                }
             else:
-                logger.error(f"No validation rules defined for table'{table_name}'")
-                return 1
-            
-            output_config = {
-                'rejected_file': f"data/processed/rejected_{table_name}.csv",
-                'clean_file': f"data/processed/clean_{table_name}.csv"
-            }
-        
+                logger.warning("Running in command-line mode, consider using --config for better maintainability")
+                input_file = args.input
+                table_name = args.table
+
+                # Hardcoded validation rules for command-line mode
+                if table_name == "customers":
+                    validation_config = {
+                        'required_columns': ['customer_id', 'full_name', 'email', 'created_at'],
+                        'non_null_columns': ['customer_id', 'full_name', 'email', 'created_at'],
+                        'integer_columns': ['customer_id'],
+                        'datetime_columns': ['created_at']
+                    }
+                else:
+                    logger.error(f"No validation rules defined for table'{table_name}'")
+                    return EXIT_CONFIG_ERROR
+
+                output_config = {
+                    'rejected_file': f"data/processed/rejected_{table_name}.csv",
+                    'clean_file': f"data/processed/clean_{table_name}.csv"
+                }
+
+        except FileNotFoundError as e:
+            logger.error(f"Configuration file not found: {e}")
+            logger.info(f"Exit code: {EXIT_FILE_NOT_FOUND} - {get_exit_code_description(EXIT_FILE_NOT_FOUND)}")
+            return EXIT_FILE_NOT_FOUND
+        except ConfigError as e:
+            logger.error(f"Configuration error: {e}")
+            logger.info(f"Exit code: {EXIT_CONFIG_ERROR} - {get_exit_code_description(EXIT_CONFIG_ERROR)}")
+            return EXIT_CONFIG_ERROR
+
         logger.info(f"Input file: {input_file}")
         logger.info(f"Target table: {table_name}")
 
         # Extract
         logger.info("\n[1/4] Extracting data from CSV...")
-        df = extract_csv(input_file)
+        try:
+            df = extract_csv(input_file)
+        except FileNotFoundError as e:
+            logger.error(f"Input file not found: {e}")
+            logger.info(f"Exit code: {EXIT_FILE_NOT_FOUND} - {get_exit_code_description(EXIT_FILE_NOT_FOUND)}")
+            return EXIT_FILE_NOT_FOUND
+        except ExtractionError as e:
+            logger.error(f"Data extraction error: {e}")
+            logger.info(f"Exit code: {EXIT_FILE_READ_ERROR} - {get_exit_code_description(EXIT_FILE_READ_ERROR)}")
+            return EXIT_FILE_READ_ERROR
 
         # Validate
         logger.info("\n[2/4] Validating data...")
+        try:
+            valid_df, rejected_df = validate_dataframe(
+                df=df,
+                required_columns=validation_config['required_columns'],
+                non_null_columns=validation_config['non_null_columns'],
+                integer_columns=validation_config['integer_columns'],
+                datetime_columns=validation_config['datetime_columns']
+            )
+        except ValueError as e:
+            logger.error(f"Data validation error: {e}")
+            logger.info(f"Exit code: {EXIT_VALIDATION_ERROR} - {get_exit_code_description(EXIT_VALIDATION_ERROR)}")
+            return EXIT_VALIDATION_ERROR
 
-        valid_df, rejected_df = validate_dataframe(
-            df=df,
-            required_columns=validation_config['required_columns'],
-            non_null_columns=validation_config['non_null_columns'],
-            integer_columns=validation_config['integer_columns'],
-            datetime_columns=validation_config['datetime_columns']
-        )
-        
         # Save rejected rows
         if len(rejected_df) > 0:
             rejected_file = output_config.get('rejected_file', f"data/processed/rejected_{table_name}.csv")
             save_rejected_rows(rejected_df, rejected_file)
-        
-        # If no valid rows, stop here
 
+        # If no valid rows, stop here
         if len(valid_df) == 0:
             logger.error("No valid rows to load into the database. Exiting pipeline.")
-            return 1
-        
+            logger.info(f"Exit code: {EXIT_NO_VALID_ROWS} - {get_exit_code_description(EXIT_NO_VALID_ROWS)}")
+            return EXIT_NO_VALID_ROWS
+
         # Transform
         logger.info("\n[3/4] Transforming data...")
-        transformed_df = transform_dataframe(valid_df, table_name)
+        try:
+            transformed_df = transform_dataframe(valid_df, table_name)
+        except Exception as e:
+            logger.error(f"Data transformation error: {e}")
+            logger.exception("Full traceback:")
+            logger.info(f"Exit code: {EXIT_GENERAL_ERROR} - {get_exit_code_description(EXIT_GENERAL_ERROR)}")
+            return EXIT_GENERAL_ERROR
 
         # Save transformed data
         clean_file = output_config.get('clean_file', f"data/processed/clean_{table_name}.csv")
@@ -137,7 +167,13 @@ def main():
 
         # Load
         logger.info("\n[4/4] Loading data into database...")
-        rows_loaded = load_to_db(transformed_df, table_name)
+        try:
+            rows_loaded = load_to_db(transformed_df, table_name)
+        except Exception as e:
+            logger.error(f"Data loading error: {e}")
+            logger.exception("Full traceback:")
+            logger.info(f"Exit code: {EXIT_DB_LOAD_ERROR} - {get_exit_code_description(EXIT_DB_LOAD_ERROR)}")
+            return EXIT_DB_LOAD_ERROR
 
         # Summary
         logger.info("\n" + "=" * 60)
@@ -148,17 +184,20 @@ def main():
         logger.info(f"Rows transformed: {len(transformed_df)}")
         logger.info(f"Rows loaded: {rows_loaded}")
         logger.info("=" * 60)
+        logger.info(f"Exit code: {EXIT_SUCCESS} - {get_exit_code_description(EXIT_SUCCESS)}")
 
-        return 0
+        return EXIT_SUCCESS
 
-    except FileNotFoundError as e:
-        logger.error(f"File not found: {e}")
-        return 1
-    
+    except KeyboardInterrupt:
+        logger.warning("\nPipeline interrupted by user.")
+        logger.info(f"Exit code: {EXIT_GENERAL_ERROR} - Pipeline interrupted by user")
+        return EXIT_GENERAL_ERROR
+
     except Exception as e:
         logger.critical(f"Pipline failed with error: {e}")
         logger.exception("Full traceback:") # Logs the full error traceback
-        return 1
+        logger.info(f"Exit code: {EXIT_GENERAL_ERROR} - {get_exit_code_description(EXIT_GENERAL_ERROR)}")
+        return EXIT_GENERAL_ERROR
 
 if __name__ == "__main__":
     exit_code = main()
