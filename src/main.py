@@ -1,12 +1,13 @@
 import argparse
 from pathlib import Path
-from src.extract import extract_csv
+from src.extract import extract_csv, ExtractionError
 from src.validate import validate_dataframe, save_rejected_rows
 from src.transform import transform_dataframe, save_transformed_data
 from src.load import load_to_db
 from src.config_loader import load_config, ConfigError
 from src.logger import setup_logger
 from src.exit_codes import *
+from src.metrics import PipelineMetrics
 
 logger = setup_logger(__name__)
 
@@ -66,6 +67,12 @@ def main():
     logger.info("Starting ETL Pipeline")
     logger.info("=" * 60)
 
+    config_path = args.config if args.config else "command_line"
+    metrics = PipelineMetrics(
+        pipeline_name="etl_pipeline",
+        config_path=config_path,
+    )
+
     try:
         # Load config
         try:
@@ -77,6 +84,8 @@ def main():
                 table_name = config['table']
                 validation_config = config['validation']
                 output_config = config.get('output', {})
+
+                metrics.pipeline_name = f"{table_name}_etl"
 
             else:
                 logger.warning("Running in command-line mode, consider using --config for better maintainability")
@@ -92,7 +101,9 @@ def main():
                         'datetime_columns': ['created_at']
                     }
                 else:
-                    logger.error(f"No validation rules defined for table'{table_name}'")
+                    logger.error(f"No validation rules defined for table '{table_name}'")
+                    metrics.complete(EXIT_CONFIG_ERROR, "FAILED")
+                    metrics.save_report()
                     return EXIT_CONFIG_ERROR
 
                 output_config = {
@@ -103,26 +114,37 @@ def main():
         except FileNotFoundError as e:
             logger.error(f"Configuration file not found: {e}")
             logger.info(f"Exit code: {EXIT_FILE_NOT_FOUND} - {get_exit_code_description(EXIT_FILE_NOT_FOUND)}")
+            metrics.complete(EXIT_FILE_NOT_FOUND, "FAILED")
+            metrics.save_report()
             return EXIT_FILE_NOT_FOUND
         except ConfigError as e:
             logger.error(f"Configuration error: {e}")
             logger.info(f"Exit code: {EXIT_CONFIG_ERROR} - {get_exit_code_description(EXIT_CONFIG_ERROR)}")
+            metrics.complete(EXIT_CONFIG_ERROR, "FAILED")
+            metrics.save_report()
             return EXIT_CONFIG_ERROR
 
         logger.info(f"Input file: {input_file}")
         logger.info(f"Target table: {table_name}")
 
+        metrics.set_input_file(input_file)
+
         # Extract
         logger.info("\n[1/4] Extracting data from CSV...")
         try:
             df = extract_csv(input_file)
+            metrics.set_extraction_metrics(len(df))
         except FileNotFoundError as e:
             logger.error(f"Input file not found: {e}")
             logger.info(f"Exit code: {EXIT_FILE_NOT_FOUND} - {get_exit_code_description(EXIT_FILE_NOT_FOUND)}")
+            metrics.complete(EXIT_FILE_NOT_FOUND, "FAILED")
+            metrics.save_report()
             return EXIT_FILE_NOT_FOUND
         except ExtractionError as e:
             logger.error(f"Data extraction error: {e}")
             logger.info(f"Exit code: {EXIT_FILE_READ_ERROR} - {get_exit_code_description(EXIT_FILE_READ_ERROR)}")
+            metrics.complete(EXIT_FILE_READ_ERROR, "FAILED")
+            metrics.save_report()
             return EXIT_FILE_READ_ERROR
 
         # Validate
@@ -135,9 +157,12 @@ def main():
                 integer_columns=validation_config['integer_columns'],
                 datetime_columns=validation_config['datetime_columns']
             )
+            metrics.set_validation_metrics(len(valid_df), len(rejected_df))
         except ValueError as e:
             logger.error(f"Data validation error: {e}")
             logger.info(f"Exit code: {EXIT_VALIDATION_ERROR} - {get_exit_code_description(EXIT_VALIDATION_ERROR)}")
+            metrics.complete(EXIT_VALIDATION_ERROR, "FAILED")
+            metrics.save_report()
             return EXIT_VALIDATION_ERROR
 
         # Save rejected rows
@@ -155,24 +180,35 @@ def main():
         logger.info("\n[3/4] Transforming data...")
         try:
             transformed_df = transform_dataframe(valid_df, table_name)
+            metrics.set_transformation_metrics(len(transformed_df))
         except Exception as e:
             logger.error(f"Data transformation error: {e}")
             logger.exception("Full traceback:")
             logger.info(f"Exit code: {EXIT_GENERAL_ERROR} - {get_exit_code_description(EXIT_GENERAL_ERROR)}")
+            metrics.complete(EXIT_GENERAL_ERROR, "FAILED")
+            metrics.save_report()
             return EXIT_GENERAL_ERROR
 
         # Save transformed data
         clean_file = output_config.get('clean_file', f"data/processed/clean_{table_name}.csv")
         save_transformed_data(transformed_df, clean_file)
 
+        metrics.set_output_files(
+            rejected_file=rejected_file if len(rejected_df) > 0 else None,
+            clean_file=clean_file
+        )
+
         # Load
         logger.info("\n[4/4] Loading data into database...")
         try:
             rows_loaded = load_to_db(transformed_df, table_name)
+            metrics.set_load_metrics(rows_loaded)
         except Exception as e:
             logger.error(f"Data loading error: {e}")
             logger.exception("Full traceback:")
             logger.info(f"Exit code: {EXIT_DB_LOAD_ERROR} - {get_exit_code_description(EXIT_DB_LOAD_ERROR)}")
+            metrics.complete(EXIT_DB_LOAD_ERROR, "FAILED")
+            metrics.save_report()
             return EXIT_DB_LOAD_ERROR
 
         # Summary
@@ -186,17 +222,27 @@ def main():
         logger.info("=" * 60)
         logger.info(f"Exit code: {EXIT_SUCCESS} - {get_exit_code_description(EXIT_SUCCESS)}")
 
+        metrics.complete(EXIT_SUCCESS, "SUCCESS")
+        report_path = metrics.save_report()
+        logger.info(f"Metrics report: {report_path}")
+
+        metrics.print_summary()
+
         return EXIT_SUCCESS
 
     except KeyboardInterrupt:
         logger.warning("\nPipeline interrupted by user.")
         logger.info(f"Exit code: {EXIT_GENERAL_ERROR} - Pipeline interrupted by user")
+        metrics.complete(EXIT_GENERAL_ERROR, "INTERRUPTED")
+        metrics.save_report()  
         return EXIT_GENERAL_ERROR
 
     except Exception as e:
-        logger.critical(f"Pipline failed with error: {e}")
+        logger.critical(f"Pipeline failed with error: {e}")
         logger.exception("Full traceback:") # Logs the full error traceback
         logger.info(f"Exit code: {EXIT_GENERAL_ERROR} - {get_exit_code_description(EXIT_GENERAL_ERROR)}")
+        metrics.complete(EXIT_GENERAL_ERROR, "FAILED")
+        metrics.save_report()
         return EXIT_GENERAL_ERROR
 
 if __name__ == "__main__":

@@ -28,3 +28,5 @@ htmlcov/
 *.pyc
 __pycache__/
 
+# Reports
+reports/

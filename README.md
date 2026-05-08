@@ -254,6 +254,57 @@ Tests follow the AAA pattern:
 - **Act**: Call the function
 - **Assert**: Check the result
 
+## Metrics & Reporting
+
+The pipeline generates detailed metrics reports after each execution.
+
+### Metrics Tracked
+
+**Execution Metrics:**
+- Pipeline name and execution ID
+- Start/end time and duration
+- Exit code and status
+
+**Data Metrics:**
+- Rows at each stage (extracted, validated, rejected, transformed, loaded)
+- Rejection rate percentage
+- Data quality issues
+
+**File Information:**
+- Input file path and size
+- Output file paths
+
+### Reports Location
+
+Reports are saved to `reports/` directory as JSON files:
+
+reports/
+├── customers_etl_20260417_223045_abc123.json
+├── customers_etl_20260418_020000_def456.json
+└── transactions_etl_20260418_020500_ghi789.json
+
+### Example Report
+
+```json
+{
+  "pipeline_name": "customers_etl",
+  "execution_id": "20260417_223045_abc123",
+  "start_time": "2026-04-17T22:30:45.123456",
+  "end_time": "2026-04-17T22:30:52.789012",
+  "duration_seconds": 7.67,
+  "exit_code": 0,
+  "status": "SUCCESS",
+  "metrics": {
+    "rows_extracted": 10000,
+    "rows_validated": 9850,
+    "rows_rejected": 150,
+    "rows_transformed": 9850,
+    "rows_loaded": 9850,
+    "rejection_rate_percent": 1.5
+  }
+}
+```
+
 ## Development Progress
 
 - [x] Database connection and setup
@@ -266,8 +317,8 @@ Tests follow the AAA pattern:
 - [x] Idempotent loads (run multiple times safely)
 - [x] Config-driven pipeline (YAML)
 - [x] Unit tests (Day 10)
-- [ ] Error handling improvements (Day 11)
-- [ ] Run metrics and reports (Day 12)
+- [x] Error handling improvements (Day 11)
+- [x] Run metrics and reports (Day 12)
 - [ ] Multiple dataset support (Day 14)
 
 ## Troubleshooting
