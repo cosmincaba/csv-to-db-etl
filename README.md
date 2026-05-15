@@ -1,75 +1,240 @@
 # CSV to Database ETL Pipeline
 
-A production-ready Python ETL pipeline that extracts data from CSV files, validates quality, transforms for consistency, and loads into PostgreSQL with idempotent UPSERT logic.
+A production-ready Python ETL (Extract, Transform, Load) pipeline that processes CSV files and loads them into PostgreSQL with comprehensive data validation, quality checks, and monitoring.
 
-## Features
+## Overview
 
-- **Extract**: Read CSV files with automatic column name standardization
+This ETL pipeline provides a robust, scalable solution for loading CSV data into PostgreSQL with built-in data quality checks, error handling and comprehensive logging.  Perfect for data engineering projects, analytics pipelines, and learning production-grade ETL patterns.
+
+## Key Features
+
+- **Extract**: Read csv files with automatic column name standardization
 - **Validate**: 5-rule validation system with rejected row tracking
 - **Transform**: Data cleaning and standardization (whitespace, casing, dates)
-- **Load**: Idempotent UPSERT logic (safe to run multiple times)
-- **Logging**: Structured logging to files with progress tracking
-- **Config-Driven**: YAML-based configuration (no code changes for new tables)
+- **Load**: Idempotent UPSERT logic (safe to run mulptiple times)
+- **Logging**: Structured logging to files with rotation
+- **Metrics**: JSON reports with execution statistics
+- **Error Handling**: Proper exit codes for scheduler integration
+- **Config-Driven**: YAML-based configuration
+- **Tested**: Comprehensive test suite with pytest (24+ tests)
+
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Pipeline Stages](#pipeline-stages)
+- [Data Validation](#data-validation)
+- [Error Handling](#error-handling)
+- [Metrics & Reporting](#metrics--reporting)
+- [Testing](#testing)
+- [Troubleshooting](#troubleshooting)
+- [Project Structure](#project-structure)
+- [License](#license)
+
+## Arhitecture
+### Pipeline Flow
+
+┌─────────────┐
+│  CSV File   │ (Raw data with messy column names)
+└──────┬──────┘
+│
+▼
+┌─────────────┐
+│  EXTRACT    │ Read CSV, clean column names to snake_case
+└──────┬──────┘
+│
+▼
+┌─────────────┐
+│  VALIDATE   │ Check data quality (5 rules)
+└──────┬──────┘
+│
+├─────────────────┐
+│                 │
+▼                 ▼
+┌─────────┐      ┌──────────┐
+│  Valid  │      │ Rejected │ → rejected_rows.csv
+│  Rows   │      │  Rows    │   (with reasons)
+└────┬────┘      └──────────┘
+│
+▼
+┌─────────────┐
+│ TRANSFORM   │ Clean data (title case, lowercase, trim)
+└──────┬──────┘
+│
+▼
+┌─────────────┐
+│    LOAD     │ UPSERT to PostgreSQL (INSERT or UPDATE)
+└──────┬──────┘
+│
+▼
+┌─────────────┐
+│ PostgreSQL  │ Data loaded!
+└─────────────┘
+
+### System Arhitecture
+
+┌──────────────────────────────────────────────────────────┐
+│                     ETL Pipeline                         │
+│                                                          │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐          │
+│  │  Extract   │→ │  Validate  │→ │ Transform  │→         │
+│  │            │  │            │  │            │          │
+│  │ CSV Reader │  │ 5-Rule     │  │ Data       │          │
+│  │ Column     │  │ Validator  │  │ Cleaning   │          │
+│  │ Cleaner    │  │            │  │            │          │
+│  └────────────┘  └────────────┘  └────────────┘          │
+│                                                          │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐          │
+│  │   Load     │  │  Logger    │  │  Metrics   │          │
+│  │            │  │            │  │            │          │
+│  │ UPSERT     │  │ File +     │  │ JSON       │          │
+│  │ Logic      │  │ Console    │  │ Reports    │          │  
+│  └────────────┘  └────────────┘  └────────────┘          │
+└──────────────────────────────────────────────────────────┘
+│
+▼
+┌───────────────┐
+│  PostgreSQL   │
+│   Database    │
+└───────────────┘
+
+---
 
 ## Prerequisites
 
-- Docker Desktop
-- Python 3.10+
-- Git
+- **Python 3.10+** - [Download](https://www.python.org/downloads/)
+- **Docker Desktop** - [Download](https://www.docker.com/products/docker-desktop/)
+- **Git** - [Download](https://git-scm.com/downloads)
 
-## Quick Start
+## Installation
 
-### 1. Install Dependencies
+### 1. Clone the Repository
+
 ```bash
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\Activate.ps1
+git clone https://github.com/yourusername/csv-to-db-etl.git
+cd csv-to-db-etl
+```
 
-# Install requirements
+### 2. Create Virtual Environment
+
+```bash
+# Windows
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+
+# Linux/Mac
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Start PostgreSQL Database
+**Dependencies:**
+- `psycopg[binary]>=3.1.0` - PostgreSQL adapter
+- `pandas>=2.0.0` - Data manipulation
+- `python-dotenv>=1.0.0` - Environment variables
+- `pyyaml>=6.0.0` - Configuration files
+- `pytest>=7.4.0` - Testing framework
+
+### 4. Start PostgreSQL Database
+
 ```bash
 docker compose up -d
 ```
 
-### 3. Create Database Tables
+This starts PostgreSQL 15 with:
+- Port: 5432
+- Database: etl_db
+- User: etl_user
+- Password: etl_password
+
+### 5. Create Database Tables
+
 ```bash
 python -m src.create_tables
 ```
 
-### 4. Run the Pipeline
+Creates the schema defined in `sql/schema.sql`.
+
+### 6. Verify Installation
+
+```bash
+# Run tests
+pytest
+
+# Run pipeline with sample data
+python -m src.main --config configs/customers.yaml
+```
+
+## Quick Start
+
+### Run the Pipeline
+
 ```bash
 # Using config file (recommended)
 python -m src.main --config configs/customers.yaml
 
-# Or using command-line arguments (legacy)
+# Using command-line arguments (legacy)
 python -m src.main --input data/raw/customers.csv --table customers
 ```
 
-## Pipeline Architecture
+### Expected Output
+
+Starting ETL Pipeline
+[1/4] Extracting data from CSV...
+✓ Extracted 10,000 rows and 4 columns
+[2/4] Validating data...
+Validation Summary:
+Total rows: 10,000
+Valid rows: 9,850 (98.5%)
+Rejected rows: 150 (1.5%)
+[3/4] Transforming data...
+✓ Applied transformations
+[4/4] Loading data into database...
+✓ Upserted 9,850 rows into 'customers' table
+• Inserted: 1,234 new rows
+• Updated: 8,616 existing rows
+
+============================================================
+Pipeline completed successfully!
+Exit code: 0 - Success
+
+### Check the Results
+
+```bash
+# View logs
+cat logs/etl_*.log
+
+# View metrics report
+cat reports/customers_etl_*.json
+
+# View rejected rows (if any)
+cat data/processed/rejected_customers.csv
+
+# Query database
+docker exec -it csv_to_db_postgres psql -U etl_user -d etl_db
+SELECT COUNT(*) FROM customers;
 ```
-CSV File → Extract → Validate → Transform → Load → PostgreSQL
-                        ↓           ↓
-                   Rejected    Cleaned CSV
-                   Rows CSV    (for review)
-```
 
-### 4-Step Process
+---
 
-1. **Extract**: Read CSV and standardize column names to snake_case
-2. **Validate**: Check data quality (required columns, nulls, types, duplicates)
-3. **Transform**: Clean and standardize data (trim whitespace, normalize casing/dates)
-4. **Load**: UPSERT to database (INSERT new rows, UPDATE existing rows)
+# Usage
 
-## Configuration
+### Configuration File Structure
 
-The pipeline uses YAML configuration files for table-specific settings.
+Create a YAML config file for each table:
 
-### Config File Structure
 ```yaml
 # configs/customers.yaml
+
 table: customers
 input_path: data/raw/customers.csv
 delimiter: ","
@@ -80,13 +245,16 @@ validation:
     - full_name
     - email
     - created_at
+  
   non_null_columns:
     - customer_id
     - full_name
     - email
     - created_at
+  
   integer_columns:
     - customer_id
+  
   datetime_columns:
     - created_at
 
@@ -95,195 +263,217 @@ output:
   clean_file: data/processed/clean_customers.csv
 ```
 
+### Running the Pipeline
+
+```bash
+# Run with config
+python -m src.main --config configs/customers.yaml
+
+# View help
+python -m src.main --help
+
+# Check exit code (PowerShell)
+echo $LASTEXITCODE
+
+# Check exit code (Linux/Mac)
+echo $?
+```
+### Exit Codes
+
+| Code | Meaning | Description |
+|------|---------|-------------|
+| 0 | Success | Pipeline completed successfully |
+| 1 | General Error | Unhandled exception |
+| 2 | Invalid Arguments | Wrong command-line arguments |
+| 3 | File Not Found | Input file doesn't exist |
+| 4 | File Read Error | Can't read input file |
+| 5 | No Valid Rows | All data failed validation |
+| 6 | Validation Error | Data quality issues |
+| 7 | DB Connection Error | Can't connect to PostgreSQL |
+| 8 | DB Load Error | Failed to load data |
+| 9 | Config Error | Invalid or missing config |
+
+---
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file (not committed to Git):
+
+```bash
+# Database connection
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=etl_db
+DB_USER=etl_user
+DB_PASSWORD=etl_password
+```
 ### Adding New Tables
 
-1. Create a new config file: `configs/your_table.yaml`
-2. Define validation and transformation rules
-3. Run: `python -m src.main --config configs/your_table.yaml`
-
-**No code changes needed!**
-
-## Project Structure
-```
-csv-to-db-etl/
-├── configs/                    # YAML configuration files
-│   ├── customers.yaml
-│   └── transactions.yaml
-├── data/
-│   ├── raw/                    # Input CSV files
-│   └── processed/              # Output files (rejected, cleaned)
-├── logs/                       # Pipeline execution logs
-├── sql/
-│   └── schema.sql              # Database table definitions
-├── src/
-│   ├── config_loader.py        # Config file parser
-│   ├── create_tables.py        # Database setup
-│   ├── extract.py              # CSV extraction
-│   ├── load.py                 # Database loading (UPSERT)
-│   ├── logger.py               # Logging setup
-│   ├── main.py                 # Pipeline orchestrator
-│   ├── transform.py            # Data transformations
-│   └── validate.py             # Data validation rules
-├── docker-compose.yml          # PostgreSQL container
-├── requirements.txt            # Python dependencies
-└── README.md
-```
-
-## Validation Rules
-
-The pipeline validates data quality with 5 rules:
-
-1. **Required Columns**: All specified columns must exist
-2. **Null Checks**: Critical fields cannot be empty
-3. **Type Validation**: Fields must match expected types (integer, datetime)
-4. **Format Validation**: Dates must be parseable
-5. **Uniqueness**: Primary keys cannot have duplicates
-
-Failed rows are saved to `data/processed/rejected_<table>.csv` with rejection reasons.
-
-## Idempotency
-
-The pipeline uses PostgreSQL's `ON CONFLICT DO UPDATE` for idempotent loads:
-
-- **New rows** are INSERTed
-- **Existing rows** (matched by primary key) are UPDATEd
-- Safe to run multiple times without errors
-
-### Example
-```bash
-# Run 1: Inserts 3 new rows
-python -m src.main --config configs/customers.yaml
-# Output: Inserted: 3, Updated: 0
-
-# Run 2: Updates same 3 rows (no error!)
-python -m src.main --config configs/customers.yaml
-# Output: Inserted: 0, Updated: 3
-```
-
-## Output Files
-
-After each run, the pipeline generates:
-
-- **Logs**: `logs/etl_YYYYMMDD_HHMMSS.log` (detailed execution log)
-- **Rejected Rows**: `data/processed/rejected_<table>.csv` (invalid data with reasons)
-- **Cleaned Data**: `data/processed/clean_<table>.csv` (transformed data for review)
-
-## Example Output
-```
-============================================================
-Starting ETL Pipeline
-============================================================
-Input file: data/raw/customers.csv
-Target table: customers
-
-[1/4] Extracting data...
-✓ Extracted 100 rows, 4 columns
-
-[2/4] Validating data...
-Validation Summary:
-  Total rows: 100
-  Valid rows: 95 (95.0%)
-  Rejected rows: 5 (5.0%)
-
-[3/4] Transforming data...
-✓ Trimmed whitespace from all text columns
-✓ Customer transformations complete
-
-[4/4] Loading data to database...
-✓ Upserted 95 rows into 'customers' table
-  • Inserted: 23 new rows
-  • Updated: 72 existing rows
-
-============================================================
-✅ Pipeline Complete!
-   • Rows extracted: 100
-   • Rows validated: 95
-   • Rows rejected: 5
-   • Rows transformed: 95
-   • Rows loaded: 95
-============================================================
-```
-
-## Database Schema
+1. **Create schema** in `sql/schema.sql`:
 ```sql
-CREATE TABLE customers (
-    customer_id INTEGER PRIMARY KEY,
-    full_name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL
-);
-
-CREATE TABLE transactions (
-    transaction_id TEXT PRIMARY KEY,
-    customer_id INTEGER NOT NULL REFERENCES customers(customer_id),
-    amount NUMERIC(12,2) NOT NULL,
-    currency TEXT NOT NULL,
-    transaction_date DATE NOT NULL
-);
+   CREATE TABLE products (
+       product_id INTEGER PRIMARY KEY,
+       product_name TEXT NOT NULL,
+       price NUMERIC(10,2) NOT NULL
+   );
 ```
-## Testing
 
-The project uses pytest for automated testing.
+2. **Create config** `configs/products.yaml`:
+```yaml
+   table: products
+   input_path: data/raw/products.csv
+   validation:
+     required_columns: [product_id, product_name, price]
+     non_null_columns: [product_id, product_name, price]
+     integer_columns: [product_id]
+```
 
-### Run All Tests
+3. **Run pipeline**:
 ```bash
-pytest
+   python -m src.main --config configs/products.yaml
 ```
 
-### Run Tests with Coverage
-```bash
-pytest --cov=src
+---
+
+## Pipeline Stages
+
+### 1. Extract
+
+**What it does:**
+- Reads CSV file
+- Cleans column names to snake_case
+- Handles special characters and spaces
+
+**Example:**
+
+"Full Name" → "full_name"
+"Email@Address" → "email_address"
+"Customer#ID" → "customer_id"
+
+### 2. Validate
+
+**5 Validation Rules:**
+
+1. **Required Columns** - All specified columns must exist
+2. **Null Checks** - Critical fields cannot be empty
+3. **Type Validation** - Fields must match expected types (integer, datetime)
+4. **Format Validation** - Dates must be parseable
+5. **Uniqueness** - Primary keys cannot have duplicates
+
+**Failed rows are saved to:** `data/processed/rejected_<table>.csv` with rejection reasons.
+
+### 3. Transform
+
+**Data Cleaning:**
+- **Title case** for names: "JOHN DOE" → "John Doe"
+- **Lowercase** for emails: "JOHN@EMAIL.COM" → "john@email.com"
+- **Trim whitespace**: "  data  " → "data"
+- **Date normalization**: Various formats → ISO 8601
+
+### 4. Load
+
+**UPSERT Logic** (PostgreSQL `ON CONFLICT DO UPDATE`):
+- If row exists (matched by primary key) → UPDATE
+- If row doesn't exist → INSERT
+- **Idempotent**: Safe to run multiple times!
+
+**Example:**
+```sql
+INSERT INTO customers (customer_id, full_name, email, created_at)
+VALUES (1, 'John Doe', 'john@email.com', '2024-01-15')
+ON CONFLICT (customer_id)
+DO UPDATE SET
+  full_name = EXCLUDED.full_name,
+  email = EXCLUDED.email,
+  created_at = EXCLUDED.created_at;
 ```
 
-### Run Specific Test File
-```bash
-pytest tests/test_validate.py
+---
+
+## Data Validation
+
+### Validation Process
+
+```python
+# Example validation config
+validation:
+  required_columns: [customer_id, full_name, email]
+  non_null_columns: [customer_id, email]
+  integer_columns: [customer_id]
+  datetime_columns: [created_at]
 ```
 
-### Test Structure
-```
-tests/
-├── __init__.py
-├── test_config_loader.py  # Config parsing tests
-├── test_transform.py      # Data transformation tests
-└── test_validate.py       # Data validation tests
+### Rejection Tracking
+
+**Rejected rows CSV includes:**
+- All original columns
+- 'rejection_reason' column explaining why rejected
+
+**Example rejected row:**
+```csv
+customer_id,full_name,email,created_at,rejection_reason
+ABC,John Doe,john@email.com,2024-01-15,invalid customer_id (not an integer)
 ```
 
-Tests follow the AAA pattern:
-- **Arrange**: Set up test data
-- **Act**: Call the function
-- **Assert**: Check the result
+### Validation Best Practices
+
+- Start lenient, tighten over time
+- Review rejected rows regularly
+- Alert when rejection rate > threshold
+- Track rejection trends over time
+
+## Error Handling
+
+### Error Recovery
+
+The pipeline handles errors gracefully:
+
+```python
+try:
+    df = extract_csv(input_file)
+except FileNotFoundError:
+    logger.error(f"File not found: {input_file}")
+    return EXIT_FILE_NOT_FOUND  # Exit code 3
+```
+
+### Scheduler Integration
+
+**Compatible with:**
+- Apache Airflow
+- Cron
+- Windows Task Scheduler
+- Jenkins
+- GitHub Actions
+
+**Example Airflow DAG:**
+
+```python
+from airflow import DAG
+from airflow.operators.bash import BashOperator
+
+dag = DAG('customer_etl', schedule_interval='0 2 * * *')
+
+run_etl = BashOperator(
+    task_id='load_customers',
+    bash_command='python /etl/src/main.py --config /etl/configs/customers.yaml',
+    dag=dag
+)
+```
+
+Airflow will:
+- Mark task as SUCCESS if exit code = 0
+- Mark task as FAILED if exit code ≠ 0
+- Send alerts on failure
+
+---
 
 ## Metrics & Reporting
 
-The pipeline generates detailed metrics reports after each execution.
+### Metrics Reports
 
-### Metrics Tracked
-
-**Execution Metrics:**
-- Pipeline name and execution ID
-- Start/end time and duration
-- Exit code and status
-
-**Data Metrics:**
-- Rows at each stage (extracted, validated, rejected, transformed, loaded)
-- Rejection rate percentage
-- Data quality issues
-
-**File Information:**
-- Input file path and size
-- Output file paths
-
-### Reports Location
-
-Reports are saved to `reports/` directory as JSON files:
-
-reports/
-├── customers_etl_20260417_223045_abc123.json
-├── customers_etl_20260418_020000_def456.json
-└── transactions_etl_20260418_020500_ghi789.json
-
-### Example Report
+After each run, a JSON report is generated:
 
 ```json
 {
@@ -301,73 +491,275 @@ reports/
     "rows_transformed": 9850,
     "rows_loaded": 9850,
     "rejection_rate_percent": 1.5
+  },
+  "data_quality": {
+    "validation_errors": {
+      "null_values": 45,
+      "invalid_integer": 32,
+      "duplicate": 73
+    }
   }
 }
 ```
 
-## Development Progress
+### Using Metrics
 
-- [x] Database connection and setup
-- [x] Extract CSV files
-- [x] Validate data quality (5 rules)
-- [x] Transform and clean data
-- [x] Load to database with UPSERT
-- [x] Structured logging to files
-- [x] CLI with argparse
-- [x] Idempotent loads (run multiple times safely)
-- [x] Config-driven pipeline (YAML)
-- [x] Unit tests (Day 10)
-- [x] Error handling improvements (Day 11)
-- [x] Run metrics and reports (Day 12)
-- [ ] Multiple dataset support (Day 14)
+```python
+# Load and analyze reports
+import json
+import pandas as pd
+from pathlib import Path
+
+reports = []
+for file in Path('reports').glob('*.json'):
+    with open(file) as f:
+        reports.append(json.load(f))
+
+df = pd.DataFrame(reports)
+print(df[['start_time', 'duration_seconds', 'rejection_rate_percent']])
+```
+
+---
+
+## Testing
+
+### Run Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_validate.py
+
+```
+
+### Test Coverage
+
+**Current test suite: 24 tests**
+
+- `test_validate.py` - 5 validation tests
+- `test_transform.py` - 8 transformation tests
+- `test_config_loader.py` - 5 config tests
+- `test_error_handling.py` - 6 error scenario tests
+
+### Writing New Tests
+
+```python
+# tests/test_your_feature.py
+import pytest
+from src.your_module import your_function
+
+def test_your_feature():
+    # Arrange
+    input_data = ...
+    
+    # Act
+    result = your_function(input_data)
+    
+    # Assert
+    assert result == expected_output
+```
+
+---
 
 ## Troubleshooting
 
-### Docker Issues
+### Common Issues
+
+#### 1. Database Connection Error
+
+**Error:** `Can't connect to PostgreSQL`
+
+**Solutions:**
 ```bash
-# Check if PostgreSQL is running
+# Check if Docker is running
 docker ps
 
-# View container logs
-docker logs csv_to_db_postgres
+# Check if PostgreSQL container is up
+docker compose ps
 
 # Restart containers
 docker compose restart
+
+# Check logs
+docker logs csv_to_db_postgres
 ```
 
-### Database Connection
+#### 2. File Not Found
+**Error:** `File not found: data/raw/customers.csv`
+
+**Solutions:**
+- Check file path in config
+- Verify file exists: `ls data/raw/`
+- Check file permissions
+- Use absolute path if needed
+
+#### 3. Validation Errors
+
+**Error:** `All rows failed validation`
+
+**Solutions:**
 ```bash
-# Connect to PostgreSQL
-docker exec -it csv_to_db_postgres psql -U etl_user -d etl_db
+# Check rejected rows file
+cat data/processed/rejected_customers.csv
 
-# Check tables
-\dt
-
-# View data
-SELECT * FROM customers LIMIT 10;
-
-# Exit
-\q
+# Review rejection reasons
+# Common issues:
+# - Column name mismatch
+# - Wrong data types
+# - Missing required columns
 ```
 
-### Pipeline Issues
+#### 4. Import Errors
+
+**Error:** `ModuleNotFoundError: No module named 'src'`
+
+**Solutions:**
 ```bash
-# Check recent logs
-ls logs/
+# Activate virtual environment
+.venv\Scripts\Activate.ps1  # Windows
+source .venv/bin/activate    # Linux/Mac
+
+# Reinstall dependencies
+pip install -r requirements.txt
+
+# Run from project root
+cd /path/to/csv-to-db-etl
+python -m src.main --config ...
+```
+
+#### 5. Permission Denied
+
+**Error:** `Permission denied: 'logs/etl.log'`
+
+**Solutions:**
+```bash
+# Create directories
+mkdir logs reports data/processed
+
+# Fix permissions (Linux/Mac)
+chmod -R 755 logs reports data
+
+# Run as administrator (Windows)
+# Right-click → Run as Administrator
+```
+
+### Debug Mode
+
+```bash
+# Enable debug logging
+# Add to config.py:
+LOG_LEVEL = "DEBUG"
+
+# View detailed logs
 cat logs/etl_*.log
 
-# View rejected rows
-cat data/processed/rejected_customers.csv
+# Check specific module
+python -m src.extract  # Test extraction only
+python -m src.validate  # Test validation only
 ```
 
-## Technologies Used
+---
 
-- **Python 3.10+**: Core language
-- **pandas**: Data manipulation and CSV processing
-- **psycopg3**: PostgreSQL database adapter
-- **PyYAML**: Configuration file parsing
-- **Docker**: PostgreSQL containerization
+## Project Structure
+
+csv-to-db-etl/
+├── configs/                    # YAML configuration files
+│   ├── customers.yaml
+│   └── transactions.yaml
+│
+├── data/
+│   ├── raw/                    # Input CSV files
+│   │   ├── customers.csv
+│   │   └── transactions.csv
+│   └── processed/              # Output files
+│       ├── rejected_.csv      # Rejected rows with reasons
+│       └── clean_.csv         # Cleaned data
+│
+├── logs/                       # Pipeline execution logs
+│   └── etl_YYYYMMDD_HHMMSS.log
+│
+├── reports/                    # Metrics reports (JSON)
+│   └── etl.json
+│
+├── sql/
+│   └── schema.sql              # Database table definitions
+│
+├── src/                        # Source code
+│   ├── init.py
+│   ├── config.py               # Database configuration
+│   ├── config_loader.py        # YAML config parser
+│   ├── create_tables.py        # Database setup
+│   ├── exit_codes.py           # Exit code constants
+│   ├── extract.py              # CSV extraction
+│   ├── load.py                 # Database loading
+│   ├── logger.py               # Logging setup
+│   ├── main.py                 # Pipeline orchestrator
+│   ├── metrics.py              # Metrics tracking
+│   ├── transform.py            # Data transformation
+│   └── validate.py             # Data validation
+│
+├── tests/                      # Test suite
+│   ├── init.py
+│   ├── test_config_loader.py
+│   ├── test_error_handling.py
+│   ├── test_transform.py
+│   └── test_validate.py
+│
+├── .env                        # Environment variables (not in Git)
+├── .gitignore                  # Git ignore rules
+├── docker-compose.yml          # PostgreSQL container config
+├── pytest.ini                  # Pytest configuration
+├── README.md                   # This file
+└── requirements.txt            # Python dependencies
 
 ## License
 
-This project is open source and available for educational purposes.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Contact & Support
+
+- **Issues**: [GitHub Issues](https://github.com/cosmincaba/csv-to-db-etl/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/cosmincaba/csv-to-db-etl/discussions)
+- **Email**: cosmincaba07@gmail.com
+
+## Related Technologies
+
+- [Pandas Documentation](https://pandas.pydata.org/docs/)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [pytest Documentation](https://docs.pytest.org/)
+- [Apache Airflow](https://airflow.apache.org/)
+
+---
+
+## Roadmap
+
+**Completed:**
+- Basic ETL pipeline
+- Data validation
+- UPSERT logic
+- Config-driven design
+- Error handling
+- Metrics & reporting
+- Test suite
+
+## Aknowledgments
+
+Built with:
+- Python
+- PostgreSQL
+- Docker
+- pandas
+- pytest
+
+<div align="center">
+
+**Made with luv for the data engineering community**
+
+[⬆ Back to Top](#csv-to-database-etl-pipeline)
+
+</div>
