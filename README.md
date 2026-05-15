@@ -41,55 +41,65 @@ This ETL pipeline provides a robust, scalable solution for loading CSV data into
 
 ```mermaid
 graph TD
-    A[CSV FileRaw data] --> B[EXTRACTClean column names]
-    B --> C[VALIDATE5 validation rules]
-    C --> D[Valid Rows]
-    C --> E[Rejected Rows]
-    E --> F[rejected_rows.csvwith reasons]
-    D --> G[TRANSFORMClean & standardize]
-    G --> H[LOADUPSERT to PostgreSQL]
-    H --> I[(PostgreSQLDatabase)]
+    A["📄 CSV File(Raw data with messy columns)"] --> B["🔍 EXTRACTClean column names to snake_case"]
+    B --> C["✅ VALIDATEApply 5 validation rules"]
+    C -->|Valid| D["✔️ Valid Rows(Pass all checks)"]
+    C -->|Failed| E["❌ Rejected Rows(Quality issues)"]
+    E --> F["📋 rejected_rows.csv(Saved with reasons)"]
+    D --> G["🔄 TRANSFORMClean & standardize data"]
+    G --> H["💾 LOADUPSERT to PostgreSQL"]
+    H --> I[("🗄️ PostgreSQLDatabase")]
     
-    style A fill:#e1f5ff
-    style I fill:#d4edda
-    style E fill:#f8d7da
-    style H fill:#fff3cd
+    style A fill:#E3F2FD,stroke:#1976D2,stroke-width:2px,color:#000
+    style B fill:#E8F5E9,stroke:#388E3C,stroke-width:2px,color:#000
+    style C fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#000
+    style D fill:#C8E6C9,stroke:#388E3C,stroke-width:2px,color:#000
+    style E fill:#FFCDD2,stroke:#D32F2F,stroke-width:2px,color:#000
+    style F fill:#FFEBEE,stroke:#C62828,stroke-width:2px,color:#000
+    style G fill:#E1BEE7,stroke:#7B1FA2,stroke-width:2px,color:#000
+    style H fill:#FFF9C4,stroke:#F9A825,stroke-width:2px,color:#000
+    style I fill:#B2DFDB,stroke:#00796B,stroke-width:3px,color:#000
 ```
 
 ### System Components
 
 ```mermaid
-graph LR
-    subgraph "ETL Pipeline"
-        A[Extract] --> B[Validate]
-        B --> C[Transform]
-        C --> D[Load]
+graph TB
+    subgraph ETL["🔧 ETL Pipeline Core"]
+        direction LR
+        A["📥 Extract(CSV Reader)"]
+        B["✅ Validate(Quality Checks)"]
+        C["🔄 Transform(Data Cleaning)"]
+        D["💾 Load(UPSERT Logic)"]
+        A --> B --> C --> D
     end
     
-    subgraph "Supporting Systems"
-        E[Logger]
-        F[Metrics]
-        G[Config]
+    subgraph Support["🛠️ Supporting Systems"]
+        direction TB
+        E["📝 Logger(File + Console)"]
+        F["📊 Metrics(JSON Reports)"]
+        G["⚙️ Config(YAML Files)"]
+        H["🚨 Error Handler(Exit Codes)"]
     end
     
-    D --> H[(PostgreSQL)]
+    D --> I[("🗄️ PostgreSQLDatabase")]
     
-    E -.-> A
-    E -.-> B
-    E -.-> C
-    E -.-> D
+    E -.->|"Logs to"| ETL
+    F -.->|"Tracks"| ETL
+    G -.->|"Configures"| ETL
+    H -.->|"Handles"| ETL
     
-    F -.-> A
-    F -.-> B
-    F -.-> C
-    F -.-> D
-    
-    G -.-> A
-    G -.-> B
-    G -.-> C
-    G -.-> D
-    
-    style H fill:#d4edda
+    style ETL fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
+    style Support fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
+    style A fill:#E8F5E9,stroke:#388E3C,stroke-width:2px,color:#000
+    style B fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#000
+    style C fill:#E1BEE7,stroke:#7B1FA2,stroke-width:2px,color:#000
+    style D fill:#FFF9C4,stroke:#F9A825,stroke-width:2px,color:#000
+    style E fill:#E0F2F1,stroke:#00897B,stroke-width:2px,color:#000
+    style F fill:#E0F7FA,stroke:#0097A7,stroke-width:2px,color:#000
+    style G fill:#F1F8E9,stroke:#689F38,stroke-width:2px,color:#000
+    style H fill:#FBE9E7,stroke:#D84315,stroke-width:2px,color:#000
+    style I fill:#B2DFDB,stroke:#00796B,stroke-width:3px,color:#000
 ```
 
 ---
