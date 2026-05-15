@@ -41,66 +41,73 @@ This ETL pipeline provides a robust, scalable solution for loading CSV data into
 
 ```mermaid
 graph TD
-    A["📄 CSV File(Raw data with messy columns)"] --> B["🔍 EXTRACTClean column names to snake_case"]
-    B --> C["✅ VALIDATEApply 5 validation rules"]
-    C -->|Valid| D["✔️ Valid Rows(Pass all checks)"]
-    C -->|Failed| E["❌ Rejected Rows(Quality issues)"]
-    E --> F["📋 rejected_rows.csv(Saved with reasons)"]
-    D --> G["🔄 TRANSFORMClean & standardize data"]
-    G --> H["💾 LOADUPSERT to PostgreSQL"]
-    H --> I[("🗄️ PostgreSQLDatabase")]
+    A["CSV FileRaw data"] --> B["EXTRACTClean column names"]
+    B --> C["VALIDATE5 validation rules"]
+    C -->|Valid| D["Valid Rows"]
+    C -->|Failed| E["Rejected Rows"]
+    E --> F["rejected_rows.csvwith reasons"]
+    D --> G["TRANSFORMClean and standardize"]
+    G --> H["LOADUPSERT to PostgreSQL"]
+    H --> I[("PostgreSQLDatabase")]
     
-    style A fill:#E3F2FD,stroke:#1976D2,stroke-width:2px,color:#000
-    style B fill:#E8F5E9,stroke:#388E3C,stroke-width:2px,color:#000
-    style C fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#000
-    style D fill:#C8E6C9,stroke:#388E3C,stroke-width:2px,color:#000
-    style E fill:#FFCDD2,stroke:#D32F2F,stroke-width:2px,color:#000
-    style F fill:#FFEBEE,stroke:#C62828,stroke-width:2px,color:#000
-    style G fill:#E1BEE7,stroke:#7B1FA2,stroke-width:2px,color:#000
-    style H fill:#FFF9C4,stroke:#F9A825,stroke-width:2px,color:#000
-    style I fill:#B2DFDB,stroke:#00796B,stroke-width:3px,color:#000
+    style A fill:#f8f9fa,stroke:#495057,stroke-width:2px,color:#212529
+    style B fill:#e9ecef,stroke:#495057,stroke-width:2px,color:#212529
+    style C fill:#dee2e6,stroke:#495057,stroke-width:2px,color:#212529
+    style D fill:#d3f9d8,stroke:#2d6a4f,stroke-width:2px,color:#212529
+    style E fill:#ffe0e0,stroke:#c92a2a,stroke-width:2px,color:#212529
+    style F fill:#fff5f5,stroke:#c92a2a,stroke-width:2px,color:#212529
+    style G fill:#e9ecef,stroke:#495057,stroke-width:2px,color:#212529
+    style H fill:#fff9db,stroke:#f59f00,stroke-width:2px,color:#212529
+    style I fill:#d3f9d8,stroke:#2d6a4f,stroke-width:3px,color:#212529
 ```
 
 ### System Components
 
 ```mermaid
-graph TB
-    subgraph ETL["🔧 ETL Pipeline Core"]
-        direction LR
-        A["📥 Extract(CSV Reader)"]
-        B["✅ Validate(Quality Checks)"]
-        C["🔄 Transform(Data Cleaning)"]
-        D["💾 Load(UPSERT Logic)"]
-        A --> B --> C --> D
+graph LR
+    subgraph Pipeline["ETL Pipeline"]
+        A[Extract] --> B[Validate]
+        B --> C[Transform]
+        C --> D[Load]
     end
     
-    subgraph Support["🛠️ Supporting Systems"]
-        direction TB
-        E["📝 Logger(File + Console)"]
-        F["📊 Metrics(JSON Reports)"]
-        G["⚙️ Config(YAML Files)"]
-        H["🚨 Error Handler(Exit Codes)"]
+    subgraph Support["Supporting Systems"]
+        E[Logger]
+        F[Metrics]
+        G[Config]
     end
     
-    D --> I[("🗄️ PostgreSQLDatabase")]
+    D --> H[(PostgreSQL)]
     
-    E -.->|"Logs to"| ETL
-    F -.->|"Tracks"| ETL
-    G -.->|"Configures"| ETL
-    H -.->|"Handles"| ETL
+    E -.-> Pipeline
+    F -.-> Pipeline
+    G -.-> Pipeline
     
-    style ETL fill:#E3F2FD,stroke:#1976D2,stroke-width:2px
-    style Support fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
-    style A fill:#E8F5E9,stroke:#388E3C,stroke-width:2px,color:#000
-    style B fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#000
-    style C fill:#E1BEE7,stroke:#7B1FA2,stroke-width:2px,color:#000
-    style D fill:#FFF9C4,stroke:#F9A825,stroke-width:2px,color:#000
-    style E fill:#E0F2F1,stroke:#00897B,stroke-width:2px,color:#000
-    style F fill:#E0F7FA,stroke:#0097A7,stroke-width:2px,color:#000
-    style G fill:#F1F8E9,stroke:#689F38,stroke-width:2px,color:#000
-    style H fill:#FBE9E7,stroke:#D84315,stroke-width:2px,color:#000
-    style I fill:#B2DFDB,stroke:#00796B,stroke-width:3px,color:#000
+    style Pipeline fill:#f8f9fa,stroke:#495057,stroke-width:2px
+    style Support fill:#f8f9fa,stroke:#495057,stroke-width:2px
+    style A fill:#e9ecef,stroke:#495057,stroke-width:2px,color:#212529
+    style B fill:#e9ecef,stroke:#495057,stroke-width:2px,color:#212529
+    style C fill:#e9ecef,stroke:#495057,stroke-width:2px,color:#212529
+    style D fill:#e9ecef,stroke:#495057,stroke-width:2px,color:#212529
+    style E fill:#f1f3f5,stroke:#868e96,stroke-width:2px,color:#212529
+    style F fill:#f1f3f5,stroke:#868e96,stroke-width:2px,color:#212529
+    style G fill:#f1f3f5,stroke:#868e96,stroke-width:2px,color:#212529
+    style H fill:#d3f9d8,stroke:#2d6a4f,stroke-width:3px,color:#212529
 ```
+
+### Pipeline Stages
+
+**Extract**  
+Read CSV files and clean column names to snake_case format.
+
+**Validate**  
+Apply 5 validation rules to check data quality. Split rows into valid and rejected sets.
+
+**Transform**  
+Clean and standardize data (title case, lowercase, trim whitespace, normalize dates).
+
+**Load**  
+UPSERT to PostgreSQL using `ON CONFLICT DO UPDATE` for idempotent loads.
 
 ---
 
