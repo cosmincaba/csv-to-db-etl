@@ -36,71 +36,61 @@ This ETL pipeline provides a robust, scalable solution for loading CSV data into
 - [License](#license)
 
 ## Arhitecture
+
 ### Pipeline Flow
 
-┌─────────────┐
-│  CSV File   │ (Raw data with messy column names)
-└──────┬──────┘
-│
-▼
-┌─────────────┐
-│  EXTRACT    │ Read CSV, clean column names to snake_case
-└──────┬──────┘
-│
-▼
-┌─────────────┐
-│  VALIDATE   │ Check data quality (5 rules)
-└──────┬──────┘
-│
-├─────────────────┐
-│                 │
-▼                 ▼
-┌─────────┐      ┌──────────┐
-│  Valid  │      │ Rejected │ → rejected_rows.csv
-│  Rows   │      │  Rows    │   (with reasons)
-└────┬────┘      └──────────┘
-│
-▼
-┌─────────────┐
-│ TRANSFORM   │ Clean data (title case, lowercase, trim)
-└──────┬──────┘
-│
-▼
-┌─────────────┐
-│    LOAD     │ UPSERT to PostgreSQL (INSERT or UPDATE)
-└──────┬──────┘
-│
-▼
-┌─────────────┐
-│ PostgreSQL  │ Data loaded!
-└─────────────┘
+```mermaid
+graph TD
+    A[CSV FileRaw data] --> B[EXTRACTClean column names]
+    B --> C[VALIDATE5 validation rules]
+    C --> D[Valid Rows]
+    C --> E[Rejected Rows]
+    E --> F[rejected_rows.csvwith reasons]
+    D --> G[TRANSFORMClean & standardize]
+    G --> H[LOADUPSERT to PostgreSQL]
+    H --> I[(PostgreSQLDatabase)]
+    
+    style A fill:#e1f5ff
+    style I fill:#d4edda
+    style E fill:#f8d7da
+    style H fill:#fff3cd
+```
 
-### System Arhitecture
+### System Components
 
-┌──────────────────────────────────────────────────────────┐
-│                     ETL Pipeline                         │
-│                                                          │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐          │
-│  │  Extract   │→ │  Validate  │→ │ Transform  │→         │
-│  │            │  │            │  │            │          │
-│  │ CSV Reader │  │ 5-Rule     │  │ Data       │          │
-│  │ Column     │  │ Validator  │  │ Cleaning   │          │
-│  │ Cleaner    │  │            │  │            │          │
-│  └────────────┘  └────────────┘  └────────────┘          │
-│                                                          │
-│  ┌────────────┐  ┌────────────┐  ┌────────────┐          │
-│  │   Load     │  │  Logger    │  │  Metrics   │          │
-│  │            │  │            │  │            │          │
-│  │ UPSERT     │  │ File +     │  │ JSON       │          │
-│  │ Logic      │  │ Console    │  │ Reports    │          │  
-│  └────────────┘  └────────────┘  └────────────┘          │
-└──────────────────────────────────────────────────────────┘
-│
-▼
-┌───────────────┐
-│  PostgreSQL   │
-│   Database    │
-└───────────────┘
+```mermaid
+graph LR
+    subgraph "ETL Pipeline"
+        A[Extract] --> B[Validate]
+        B --> C[Transform]
+        C --> D[Load]
+    end
+    
+    subgraph "Supporting Systems"
+        E[Logger]
+        F[Metrics]
+        G[Config]
+    end
+    
+    D --> H[(PostgreSQL)]
+    
+    E -.-> A
+    E -.-> B
+    E -.-> C
+    E -.-> D
+    
+    F -.-> A
+    F -.-> B
+    F -.-> C
+    F -.-> D
+    
+    G -.-> A
+    G -.-> B
+    G -.-> C
+    G -.-> D
+    
+    style H fill:#d4edda
+```
 
 ---
 
@@ -667,55 +657,31 @@ python -m src.validate  # Test validation only
 
 ## Project Structure
 
-csv-to-db-etl/
-├── configs/                    # YAML configuration files
-│   ├── customers.yaml
-│   └── transactions.yaml
-│
-├── data/
-│   ├── raw/                    # Input CSV files
-│   │   ├── customers.csv
-│   │   └── transactions.csv
-│   └── processed/              # Output files
-│       ├── rejected_.csv      # Rejected rows with reasons
-│       └── clean_.csv         # Cleaned data
-│
-├── logs/                       # Pipeline execution logs
-│   └── etl_YYYYMMDD_HHMMSS.log
-│
-├── reports/                    # Metrics reports (JSON)
-│   └── etl.json
-│
-├── sql/
-│   └── schema.sql              # Database table definitions
-│
-├── src/                        # Source code
-│   ├── init.py
-│   ├── config.py               # Database configuration
-│   ├── config_loader.py        # YAML config parser
-│   ├── create_tables.py        # Database setup
-│   ├── exit_codes.py           # Exit code constants
-│   ├── extract.py              # CSV extraction
-│   ├── load.py                 # Database loading
-│   ├── logger.py               # Logging setup
-│   ├── main.py                 # Pipeline orchestrator
-│   ├── metrics.py              # Metrics tracking
-│   ├── transform.py            # Data transformation
-│   └── validate.py             # Data validation
-│
-├── tests/                      # Test suite
-│   ├── init.py
-│   ├── test_config_loader.py
-│   ├── test_error_handling.py
-│   ├── test_transform.py
-│   └── test_validate.py
-│
-├── .env                        # Environment variables (not in Git)
-├── .gitignore                  # Git ignore rules
-├── docker-compose.yml          # PostgreSQL container config
-├── pytest.ini                  # Pytest configuration
-├── README.md                   # This file
-└── requirements.txt            # Python dependencies
+### Key Directories
+
+| Directory | Purpose |
+|-----------|---------|
+| `configs/` | YAML configuration files for each table |
+| `data/raw/` | Input CSV files (source data) |
+| `data/processed/` | Output files (rejected/cleaned) |
+| `logs/` | Timestamped execution logs |
+| `reports/` | JSON metrics reports |
+| `src/` | Python source code modules |
+| `tests/` | Pytest test suite |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `main.py` | Pipeline orchestrator (runs ETL) |
+| `extract.py` | CSV reading and column cleaning |
+| `validate.py` | Data quality validation (5 rules) |
+| `transform.py` | Data transformation and cleaning |
+| `load.py` | Database loading with UPSERT |
+| `metrics.py` | Performance tracking and reporting |
+| `logger.py` | Structured logging setup |
+| `config_loader.py` | YAML configuration parser |
+| `exit_codes.py` | Exit code constants for schedulers |
 
 ## License
 
