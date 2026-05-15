@@ -38,17 +38,17 @@ This ETL pipeline provides a robust, scalable solution for loading CSV data into
 ## Arhitecture
 
 ### Pipeline Flow
-
+ 
 ```mermaid
 graph TD
-    A["CSV FileRaw data"] --> B["EXTRACTClean column names"]
-    B --> C["VALIDATE5 validation rules"]
+    A["CSV File<br/><br/>Raw data"] --> B["EXTRACT<br/><br/>Clean column names"]
+    B --> C["VALIDATE<br/><br/>5 validation rules"]
     C -->|Valid| D["Valid Rows"]
     C -->|Failed| E["Rejected Rows"]
-    E --> F["rejected_rows.csvwith reasons"]
-    D --> G["TRANSFORMClean and standardize"]
-    G --> H["LOADUPSERT to PostgreSQL"]
-    H --> I[("PostgreSQLDatabase")]
+    E --> F["rejected_rows.csv<br/><br/>with reasons"]
+    D --> G["TRANSFORM<br/><br/>Clean and standardize"]
+    G --> H["LOAD<br/><br/>UPSERT to PostgreSQL"]
+    H --> I[("PostgreSQL<br/><br/>Database")]
     
     style A fill:#f8f9fa,stroke:#495057,stroke-width:2px,color:#212529
     style B fill:#e9ecef,stroke:#495057,stroke-width:2px,color:#212529
